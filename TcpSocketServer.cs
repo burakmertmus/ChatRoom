@@ -24,7 +24,7 @@ namespace ChatRoom
 
             // Messages that need to be sent
             private Queue<string> _messageQueue = new Queue<string>();
-
+            private Queue<string> _chatQueue = new Queue<string>(10);
             // Extra fun data
             public readonly string ChatName;
             public readonly int Port;
@@ -116,26 +116,28 @@ namespace ChatRoom
 
                 // Let them identify themselves
                 byte[] msgBuffer = new byte[BufferSize];
+
                 int bytesRead = netStream.Read(msgBuffer, 0, msgBuffer.Length);     // Blocks
-                                                                                    //Console.WriteLine("Got {0} bytes.", bytesRead);
+                                                                                    
                 if (bytesRead > 0)
                 {
                     string msg = Encoding.UTF8.GetString(msgBuffer, 0, bytesRead);
 
-                    if (msg == "viewer")
-                    {
-                        // They just want to watch
-                        good = true;
-                        _viewers.Add(newClient);
+                    //if (msg == "viewer")
+                    //{
+                    //    // They just want to watch
+                    //    good = true;
+                    //    _viewers.Add(newClient);
 
-                        Console.WriteLine("{0} is a Viewer.", endPoint);
+                    //    Console.WriteLine("{0} is a Viewer.", endPoint);
 
-                        // Send them a "hello message"
-                        msg = String.Format("Welcome to the \"{0}\" Chat Server!", ChatName);
-                        msgBuffer = Encoding.UTF8.GetBytes(msg);
-                        netStream.Write(msgBuffer, 0, msgBuffer.Length);    // Blocks
-                    }
-                    else if (msg.StartsWith("name:"))
+                    //    // Send them a "hello message"
+                    //    msg = String.Format("Welcome to the \"{0}\" Chat Server!", ChatName);
+                    //    msgBuffer = Encoding.UTF8.GetBytes(msg);
+                    //    netStream.Write(msgBuffer, 0, msgBuffer.Length);    // Blocks
+                    //}
+
+                     if (msg.StartsWith(""))
                     {
                         // Okay, so they might be a messenger
                         string name = msg.Substring(msg.IndexOf(':') + 1);
@@ -150,7 +152,7 @@ namespace ChatRoom
                             Console.WriteLine("{0} is a Messenger with the name {1}.", endPoint, name);
 
                             // Tell the viewers we have a new messenger
-                            _messageQueue.Enqueue(String.Format("{0} has joined the chat.", name));
+                            _messageQueue.Enqueue(String.Format("{1} : {0} has joined the chat.", name,"System"));
                         }
                     }
                     else
@@ -174,8 +176,8 @@ namespace ChatRoom
                 {
                     if (_isDisconnected(v))
                     {
-                        Console.WriteLine("Viewer {0} has left.", v.Client.RemoteEndPoint);
-
+                        Console.WriteLine("{1} :Viewer {0} has left.", v.Client.RemoteEndPoint,"System");
+                        _messageQueue.Enqueue(String.Format("{1} :Viewer {0} has left.", v.Client.RemoteEndPoint, "System"));
                         // cleanup on our end
                         _viewers.Remove(v);     // Remove from list
                         _cleanupClient(v);
@@ -224,14 +226,19 @@ namespace ChatRoom
             // Clears out the message queue (and sends it to all of the viewers
             private void _sendMessages()
             {
+
                 foreach (string msg in _messageQueue)
                 {
                     // Encode the message
                     byte[] msgBuffer = Encoding.UTF8.GetBytes(msg);
 
                     // Send the message to each viewer
-                    foreach (TcpClient v in _viewers)
-                        v.GetStream().Write(msgBuffer, 0, msgBuffer.Length);    // Blocks
+                    foreach (TcpClient v in _messengers)
+                    {
+                        v.GetStream().Write(msgBuffer, 0, msgBuffer.Length);
+                        // Blocks
+                    }
+
                 }
 
                 // clear out the queue
@@ -273,7 +280,7 @@ namespace ChatRoom
             {
                 // Create the server
                 string name = "Bad IRC";//args[0].Trim();
-                int port = 6000;//int.Parse(args[1].Trim());
+                int port = 5353;//int.Parse(args[1].Trim());
                 chat = new TcpSocketServer(name, port);
 
                 // Add a handler for a Ctrl-C press
