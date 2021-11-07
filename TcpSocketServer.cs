@@ -15,8 +15,6 @@ namespace ChatRoom
         // What listens in
         private TcpListener _listener;
 
-        // types of clients connected
-        private List<TcpClient> _viewers = new List<TcpClient>();
         private List<TcpClient> _messengers = new List<TcpClient>();
 
         // Names that are taken by other messengers
@@ -94,10 +92,11 @@ namespace ChatRoom
 
 
             // Stop the server, and clean up any connected clients
-            foreach (TcpClient v in _viewers)
-                _cleanupClient(v);
             foreach (TcpClient m in _messengers)
+            {
+
                 _cleanupClient(m);
+            }
             _listener.Stop();
 
             // Closeing message
@@ -133,20 +132,6 @@ namespace ChatRoom
             {
                 string msg = Encoding.UTF8.GetString(msgBuffer, 0, bytesRead);
 
-                //if (msg == "viewer")
-                //{
-                //    // They just want to watch
-                //    good = true;
-                //    _viewers.Add(newClient);
-
-                //    Console.WriteLine("{0} is a Viewer.", endPoint);
-
-                //    // Send them a "hello message"
-                //    msg = String.Format("Welcome to the \"{0}\" Chat Server!", ChatName);
-                //    msgBuffer = Encoding.UTF8.GetBytes(msg);
-                //    netStream.Write(msgBuffer, 0, msgBuffer.Length);    // Blocks
-                //}
-
                 if (msg.StartsWith(""))
                 {
 
@@ -160,7 +145,7 @@ namespace ChatRoom
                         _messengers.Add(newClient);
 
                         Console.WriteLine("{0} is a Messenger with the name {1}.", endPoint, name);
-                        // Tell the viewers we have a new messenger
+                        // Tell the we have a new messenger
 
                         _sendChat(newClient);
 
@@ -171,12 +156,9 @@ namespace ChatRoom
                 }
                 else
                 {
-                    Console.WriteLine("Wasn't able to identify {0} as a Viewer or Messenger.", endPoint);
+                    Console.WriteLine("Error!", endPoint);
                     _cleanupClient(newClient);
                 }
-
-
-
             }
 
             if (!good)
@@ -186,19 +168,7 @@ namespace ChatRoom
         // Check For Anyone leaved server
         private void _checkForDisconnects()
         {
-            // Check the viewers first
-            foreach (TcpClient v in _viewers.ToArray())
-            {
-                if (_isDisconnected(v))
-                {
-                    Console.WriteLine("{1} :Viewer {0} has left.", v.Client.RemoteEndPoint, "System");
-                    _messageQueue.Enqueue(String.Format("{1} :Viewer {0} has left.", v.Client.RemoteEndPoint, "System"));
-                    ChatQueue.Add(String.Format("{1} :Viewer {0} has left.", v.Client.RemoteEndPoint, "System"));
-                    // cleanup on our end
-                    _viewers.Remove(v);     // Remove from list
-                    _cleanupClient(v);
-                }
-            }
+          
 
             // Check the messengers second
             foreach (TcpClient m in _messengers.ToArray())
@@ -208,10 +178,10 @@ namespace ChatRoom
                     // Get info about the messenger
                     string name = _names[m];
 
-                    // Tell the viewers someone has left
+                    // Tell the someone has left
                     Console.WriteLine("Messeger {0} has left.", name);
                     _messageQueue.Enqueue(String.Format("{0} has left the chat", name));
-
+                    ChatQueue.Add(String.Format("{1} : {0} has left.", m.Client.RemoteEndPoint, "System"));
                     // clean up on our end 
                     _messengers.Remove(m);  // Remove from list
                     _names.Remove(m);       // Remove taken name
@@ -220,16 +190,13 @@ namespace ChatRoom
             }
         }
 
-            private void _sendChat(TcpClient v)
+            private void _sendChat(TcpClient m)
             {
                 foreach (string msg in ChatQueue.Get())
                 {
                     // Encode the message
                     byte[] msgBuffer = Encoding.UTF8.GetBytes(msg);
-
-                    // Send the message to each viewer
-                    
-                    v.GetStream().Write(msgBuffer, 0, msgBuffer.Length);
+                    m.GetStream().Write(msgBuffer, 0, msgBuffer.Length);
                     
                 }
             }
@@ -252,12 +219,11 @@ namespace ChatRoom
                         string msg = String.Format("{0}: {1}", _names[m],Encoding.UTF8.GetString(msgBuffer));
                         _messageQueue.Enqueue(msg);
                         ChatQueue.Add(msg);
-
                 }
                 }
             }
 
-            // Clears out the message queue (and sends it to all of the viewers
+            // Clears out the message queue (and sends it to all of users)
             private void _sendMessages()
             {
 
@@ -266,8 +232,8 @@ namespace ChatRoom
                     // Encode the message
                     byte[] msgBuffer = Encoding.UTF8.GetBytes(msg);
 
-                    // Send the message to each viewer
-                    foreach (TcpClient v in _messengers)
+                // Send the message to each messengers
+                foreach (TcpClient v in _messengers)
                     {
                         v.GetStream().Write(msgBuffer, 0, msgBuffer.Length);
                         // Blocks
